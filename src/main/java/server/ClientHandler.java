@@ -1,53 +1,99 @@
 package server;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import protocol.Message;
+import protocol.MessageType;
+import protocol.XmlProtocol;
+
+import java.io.*;
 import java.net.Socket;
 
-public class ClientHandler implements Runnable{
-    private Socket socket;
+public class ClientHandler implements Runnable {
+    private final Socket socket;
     private BufferedReader reader;
     private PrintWriter writer;
     private String username;
 
-    public ClientHandler(Socket socket){
+    public ClientHandler(Socket socket) {
         this.socket = socket;
     }
 
     @Override
     public void run() {
         try {
-            reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            reader = new BufferedReader(
+                    new InputStreamReader(socket.getInputStream())
+            );
+
             writer = new PrintWriter(socket.getOutputStream(), true);
 
-            username = reader.readLine();
+            String loginXml = reader.readLine();
+            Message loginMessage = XmlProtocol.fromXml(loginXml);
+
+            username = loginMessage.getFrom();
 
             System.out.println(username + " connected");
-            ServerLauncher.sendToAll(username + " joined the chat", this);
 
-            String message;
-            while ((message = reader.readLine()) != null){
-                String fullMessage = username + ": " + message;
+            ServerLauncher.sendToAll(
+                    XmlProtocol.toXml(new Message(
+                            MessageType.SYSTEM,
+                            "SERVER",
+                            username + " joined the chat"
+                    )),
+                    this
+            );
 
-                System.out.println(fullMessage);
-                ServerLauncher.sendToAll(fullMessage, this);
+            String xml;
+            while ((xml = reader.readLine()) != null) {
+                Message message = XmlProtocol.fromXml(xml);
+
+                if (message.getType() == MessageType.DISCONNECT) {
+                    break;
+                }
+
+                if (message.getType() == MessageType.TEXT) {
+                    String text = message.getText();
+
+                    System.out.println(username + ": " + text);
+
+                    Message messageToSend = new Message(
+                            MessageType.TEXT,
+                            username,
+                            text
+                    );
+
+                    ServerLauncher.sendToAll(
+                            XmlProtocol.toXml(messageToSend),
+                            this
+                    );
+                }
             }
+
         } catch (IOException e) {
             System.out.println(username + " disconnected");
         } finally {
             ServerLauncher.removeClient(this);
-            ServerLauncher.sendToAll(username + " left the chat", this);
+
+            if (username != null) {
+                ServerLauncher.sendToAll(
+                        XmlProtocol.toXml(new Message(
+                                MessageType.SYSTEM,
+                                "SERVER",
+                                username + " left the chat"
+                        )),
+                        this
+                );
+            }
 
             try {
                 socket.close();
-            } catch (IOException ignored){
+            } catch (IOException ignored) {
             }
         }
     }
 
     public void sendMessage(String message) {
-        writer.println(message);
+        if (writer != null) {
+            writer.println(message);
+        }
     }
 }

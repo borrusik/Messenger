@@ -1,5 +1,9 @@
 package client;
 
+import protocol.Message;
+import protocol.MessageType;
+import protocol.XmlProtocol;
+
 import java.io.*;
 import java.net.Socket;
 import java.util.Scanner;
@@ -8,7 +12,7 @@ public class ClientLauncher {
     private static final String SERVER_IP = "127.0.0.1";
     private static final int SERVER_PORT = 8080;
 
-    static void main(String[] args) {
+    public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
         System.out.print("Enter username: ");
@@ -23,17 +27,24 @@ public class ClientLauncher {
 
             PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
 
-            writer.println(username);
+            Message loginMessage = new Message(MessageType.LOGIN, username, "");
+            writer.println(XmlProtocol.toXml(loginMessage));
 
             System.out.println("Connected to server");
             System.out.println("Write message or /exit:");
 
             Thread readThread = new Thread(() -> {
                 try {
-                    String message;
+                    String xml;
 
-                    while ((message = reader.readLine()) != null) {
-                        System.out.println(message);
+                    while ((xml = reader.readLine()) != null) {
+                        Message message = XmlProtocol.fromXml(xml);
+
+                        if (message.getType() == MessageType.SYSTEM) {
+                            System.out.println("[SERVER] " + message.getText());
+                        } else if (message.getType() == MessageType.TEXT) {
+                            System.out.println(message.getFrom() + ": " + message.getText());
+                        }
                     }
 
                 } catch (IOException e) {
@@ -44,14 +55,18 @@ public class ClientLauncher {
             readThread.start();
 
             while (true) {
-                String message = scanner.nextLine();
+                String text = scanner.nextLine();
 
-                if (message.equalsIgnoreCase("/exit")) {
+                if (text.equalsIgnoreCase("/exit")) {
+                    Message disconnectMessage = new Message(MessageType.DISCONNECT, username, "");
+                    writer.println(XmlProtocol.toXml(disconnectMessage));
+
                     socket.close();
                     break;
                 }
 
-                writer.println(message);
+                Message textMessage = new Message(MessageType.TEXT, username, text);
+                writer.println(XmlProtocol.toXml(textMessage));
             }
 
         } catch (IOException e) {

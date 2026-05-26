@@ -1,0 +1,188 @@
+.root {
+    -fx-font-family: "Segoe UI", sans-serif;
+    -fx-background-color: #f7f9fa;
+}
+
+.login-root {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e1e4e8;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+
+.label {
+    -fx-text-fill: #7d8b99;
+    -fx-font-size: 14px;
+}
+
+.text-field {
+    -fx-background-color: #d1eff6;
+    -fx-background-radius: 20px;
+    -fx-padding: 8px 16px;
+    -fx-text-fill: #333333;
+    -fx-prompt-text-fill: #99aab5;
+    -fx-border-width: 0;
+}
+
+.button {
+    -fx-background-radius: 20px;
+    -fx-padding: 8px 24px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-text-fill: #ffffff;
+}
+
+.button-cancel {
+    -fx-background-color: #e5e9ec;
+    -fx-text-fill: #7d8b99;
+}
+
+.button-primary {
+    -fx-background-color: #f7d598;
+    -fx-text-fill: #7d8b99;
+}
+
+.button-send {
+    -fx-background-color: #d1eff6;
+    -fx-text-fill: #7d8b99;
+}
+
+.button-record {
+    -fx-background-color: #e5e9ec;
+    -fx-text-fill: #5a778c;
+    -fx-padding: 8px 16px;
+}
+
+.button-recording {
+    -fx-background-color: #d94848;
+    -fx-text-fill: #ffffff;
+}
+
+.icon-button {
+    -fx-background-color: #d1eff6;
+    -fx-text-fill: #5a778c;
+    -fx-padding: 6px 12px;
+    -fx-min-width: 36px;
+}
+
+.chat-root {
+    -fx-background-color: #ffffff;
+}
+
+.chat-right-panel {
+    -fx-background-color: #f0f2f5;
+}
+
+.chat-header {
+    -fx-background-color: #b9e3f1;
+    -fx-padding: 12px;
+}
+
+.chat-header .label {
+    -fx-text-fill: #5a778c;
+    -fx-font-weight: bold;
+    -fx-font-size: 16px;
+}
+
+.list-cell {
+    -fx-background-color: transparent;
+}
+
+.list-view {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+}
+
+/* Chat Bubbles */
+.message-bubble-me {
+    -fx-background-color: #f7d598;
+    -fx-background-radius: 16px 16px 0px 16px;
+    -fx-padding: 10px 16px;
+    -fx-text-fill: #7d8b99;
+}
+
+.message-bubble-other {
+    -fx-background-color: #e5e9ec;
+    -fx-background-radius: 16px 16px 16px 0px;
+    -fx-padding: 10px 16px;
+    -fx-text-fill: #7d8b99;
+}
+
+.message-author {
+    -fx-text-fill: #aab5bc;
+    -fx-font-size: 11px;
+}
+
+.message-receipt {
+    -fx-text-fill: #8b9aa3;
+    -fx-font-size: 11px;
+}
+
+.message-receipt-read {
+    -fx-text-fill: #1e88e5;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.attachment-title {
+    -fx-text-fill: #5a778c;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+}
+
+.attachment-name {
+    -fx-text-fill: #58636b;
+    -fx-font-size: 13px;
+}
+
+.attachment-button {
+    -fx-background-color: rgba(255, 255, 255, 0.65);
+    -fx-text-fill: #5a778c;
+    -fx-padding: 5px 12px;
+    -fx-font-size: 11px;
+}
+
+.user-list-item {
+    -fx-padding: 8px;
+    -fx-border-color: transparent transparent #e1e4e8 transparent;
+    -fx-border-width: 1px;
+}
+
+.list-cell:selected {
+    -fx-background-color: #b9e3f1;
+}
+
+.list-cell:selected .user-list-item {
+    -fx-background-color: transparent;
+}
+
+.user-list-name {
+    -fx-font-weight: bold;
+    -fx-text-fill: #5a778c;
+}
+
+.user-list-status {
+    -fx-text-fill: #aab5bc;
+    -fx-font-size: 11px;
+}
+
+.unread-badge {
+    -fx-background-color: #5a9ecf;
+    -fx-background-radius: 10px;
+    -fx-text-fill: white;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-padding: 1px 6px;
+}
+
+.profile-panel {
+    -fx-padding: 12px 12px 8px 12px;
+    -fx-background-color: #f0f2f5;
+}
+
+.nickname-label {
+    -fx-text-fill: #5a778c;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}

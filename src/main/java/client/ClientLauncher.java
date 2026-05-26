@@ -2,10 +2,8 @@ package client;
 
 import protocol.Message;
 import protocol.MessageType;
-import protocol.XmlProtocol;
 
-import java.io.*;
-import java.net.Socket;
+import java.io.IOException;
 import java.util.Scanner;
 
 public class ClientLauncher {
@@ -19,54 +17,61 @@ public class ClientLauncher {
         String username = scanner.nextLine();
 
         try {
-            Socket socket = new Socket(SERVER_IP, SERVER_PORT);
-
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(socket.getInputStream())
-            );
-
-            PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
-
-            Message loginMessage = new Message(MessageType.LOGIN, username, "");
-            writer.println(XmlProtocol.toXml(loginMessage));
-
-            System.out.println("Connected to server");
-            System.out.println("Write message or /exit:");
-
-            Thread readThread = new Thread(() -> {
-                try {
-                    String xml;
-
-                    while ((xml = reader.readLine()) != null) {
-                        Message message = XmlProtocol.fromXml(xml);
-
-                        if (message.getType() == MessageType.SYSTEM) {
-                            System.out.println("[SERVER] " + message.getText());
-                        } else if (message.getType() == MessageType.TEXT) {
-                            System.out.println(message.getFrom() + ": " + message.getText());
-                        }
+            ClientConnection connection = new ClientConnection(new ClientConnection.ClientConnectionListener() {
+                @Override
+                public void onMessage(Message message) {
+                    if (message.getType() == MessageType.SYSTEM) {
+                        System.out.println("[SERVER] " + message.getText());
+                    } else if (message.getType() == MessageType.TEXT) {
+                        System.out.println(message.getFrom() + ": " + message.getText());
+                    } else if (message.getType() == MessageType.USER_LIST) {
+                        System.out.println("[ONLINE] " + message.getText());
+                    } else if (message.getType() == MessageType.ERROR) {
+                        System.out.println("[ERROR] " + message.getText());
                     }
+                }
 
-                } catch (IOException e) {
+                @Override
+                public void onDisconnected() {
                     System.out.println("Connection closed");
+                }
+
+                @Override
+                public void onError(String error) {
+                    System.out.println("Protocol error: " + error);
                 }
             });
 
-            readThread.start();
+            connection.connect(SERVER_IP, SERVER_PORT, username);
+
+            System.out.println("Connected to server");
+            System.out.println("Commands:");
+            System.out.println("/to username message - send private message");
+            System.out.println("/exit - disconnect");
 
             while (true) {
                 String text = scanner.nextLine();
 
                 if (text.equalsIgnoreCase("/exit")) {
-                    Message disconnectMessage = new Message(MessageType.DISCONNECT, username, "");
-                    writer.println(XmlProtocol.toXml(disconnectMessage));
-
-                    socket.close();
+                    connection.disconnect();
                     break;
                 }
 
-                Message textMessage = new Message(MessageType.TEXT, username, text);
-                writer.println(XmlProtocol.toXml(textMessage));
+                if (text.startsWith("/to ")) {
+                    String payload = text.substring(4).trim();
+                    int separator = payload.indexOf(' ');
+
+                    if (separator <= 0 || separator == payload.length() - 1) {
+                        System.out.println("Usage: /to username message");
+                        continue;
+                    }
+
+                    String to = payload.substring(0, separator).trim();
+                    String message = payload.substring(separator + 1).trim();
+                    connection.sendText(to, message);
+                } else {
+                    System.out.println("Use /to username message");
+                }
             }
 
         } catch (IOException e) {

@@ -14,6 +14,8 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.TextField;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
@@ -330,7 +332,7 @@ public class ClientGuiApp extends Application {
     }
 
     private void sendFile() {
-        if (!canSendPrivateAttachment()) {
+        if (!canSendAttachment()) {
             return;
         }
 
@@ -356,16 +358,18 @@ public class ClientGuiApp extends Application {
             }
 
             String messageId = UUID.randomUUID().toString();
+            boolean serverChat = SERVER_CHAT.equals(selectedUser);
+            String recipient = serverChat ? Message.ALL : selectedUser;
             addMessage(selectedUser, ChatMessage.outgoingAttachment(
-                    messageId,
+                    serverChat ? "" : messageId,
                     currentUsername,
                     MessageKind.FILE,
                     fileName,
                     mimeType,
                     data,
-                    ReceiptStatus.SENT
+                    serverChat ? ReceiptStatus.READ : ReceiptStatus.SENT
             ));
-            connection.sendFile(selectedUser, fileName, mimeType, data, messageId);
+            connection.sendFile(recipient, fileName, mimeType, data, messageId);
             chatStatusLabel.setText("");
         } catch (IOException e) {
             chatStatusLabel.setText("Cannot send file: " + e.getMessage());
@@ -375,18 +379,18 @@ public class ClientGuiApp extends Application {
     private void toggleRecording() {
         if (recording) {
             stopRecording();
-        } else if (canSendPrivateAttachment()) {
+        } else if (canSendAttachment()) {
             startRecording();
         }
     }
 
-    private boolean canSendPrivateAttachment() {
-        if (connection == null || selectedUser == null || SERVER_CHAT.equals(selectedUser)) {
-            chatStatusLabel.setText("Files and voice messages are available in private chats.");
+    private boolean canSendAttachment() {
+        if (connection == null || selectedUser == null) {
+            chatStatusLabel.setText("Select a writable chat first.");
             return false;
         }
 
-        if (!onlineUsers.contains(selectedUser)) {
+        if (!SERVER_CHAT.equals(selectedUser) && !onlineUsers.contains(selectedUser)) {
             chatStatusLabel.setText(selectedUser + " is offline");
             return false;
         }
@@ -472,22 +476,24 @@ public class ClientGuiApp extends Application {
             return;
         }
 
-        if (!canSendPrivateAttachment()) {
+        if (!canSendAttachment()) {
             return;
         }
 
         String messageId = UUID.randomUUID().toString();
         String fileName = "voice-" + System.currentTimeMillis() + ".wav";
+        boolean serverChat = SERVER_CHAT.equals(selectedUser);
+        String recipient = serverChat ? Message.ALL : selectedUser;
         addMessage(selectedUser, ChatMessage.outgoingAttachment(
-                messageId,
+                serverChat ? "" : messageId,
                 currentUsername,
                 MessageKind.AUDIO,
                 fileName,
                 "audio/wav",
                 wav,
-                ReceiptStatus.SENT
+                serverChat ? ReceiptStatus.READ : ReceiptStatus.SENT
         ));
-        connection.sendAudio(selectedUser, fileName, wav, messageId);
+        connection.sendAudio(recipient, fileName, wav, messageId);
         chatStatusLabel.setText("");
     }
 
@@ -536,10 +542,16 @@ public class ClientGuiApp extends Application {
             addMessage(message.getFrom(), chatMessage);
             handleIncomingReadState(message.getFrom(), chatMessage);
         } else if (message.getType() == MessageType.FILE || message.getType() == MessageType.AUDIO) {
-            rememberUser(message.getFrom());
+            String chat = Message.ALL.equals(message.getTo()) ? SERVER_CHAT : message.getFrom();
+            if (SERVER_CHAT.equals(chat) && message.getFrom().equals(currentUsername)) {
+                return;
+            }
+            if (!SERVER_CHAT.equals(chat)) {
+                rememberUser(message.getFrom());
+            }
             ChatMessage chatMessage = createIncomingAttachment(message);
-            addMessage(message.getFrom(), chatMessage);
-            handleIncomingReadState(message.getFrom(), chatMessage);
+            addMessage(chat, chatMessage);
+            handleIncomingReadState(chat, chatMessage);
         } else if (message.getType() == MessageType.BROADCAST) {
             if (!message.getFrom().equals(currentUsername)) {
                 addMessage(SERVER_CHAT, ChatMessage.incoming("", message.getFrom(), message.getText()));
@@ -562,7 +574,7 @@ public class ClientGuiApp extends Application {
             byte[] data = Base64.getDecoder().decode(message.getText());
             MessageKind kind = message.getType() == MessageType.AUDIO ? MessageKind.AUDIO : MessageKind.FILE;
             return ChatMessage.incomingAttachment(
-                    message.getId(),
+                    Message.ALL.equals(message.getTo()) ? "" : message.getId(),
                     message.getFrom(),
                     kind,
                     message.getFileName(),
@@ -805,8 +817,7 @@ public class ClientGuiApp extends Application {
         boolean canWrite = selectedUser != null
                 && (SERVER_CHAT.equals(selectedUser) || onlineUsers.contains(selectedUser));
         boolean canAttach = selectedUser != null
-                && !SERVER_CHAT.equals(selectedUser)
-                && onlineUsers.contains(selectedUser);
+                && (SERVER_CHAT.equals(selectedUser) || onlineUsers.contains(selectedUser));
 
         messageField.setDisable(!canWrite);
         sendButton.setDisable(!canWrite);
@@ -1037,9 +1048,12 @@ public class ClientGuiApp extends Application {
 
             if (message.mine) {
                 box.setAlignment(Pos.TOP_RIGHT);
-                Label receiptLabel = new Label(getReceiptText(message.status));
-                receiptLabel.getStyleClass().add(message.status == ReceiptStatus.READ ? "message-receipt-read" : "message-receipt");
-                box.getChildren().addAll(nameLabel, content, receiptLabel);
+                box.getChildren().addAll(nameLabel, content);
+                if (!message.id.isBlank()) {
+                    Label receiptLabel = new Label(getReceiptText(message.status));
+                    receiptLabel.getStyleClass().add(message.status == ReceiptStatus.READ ? "message-receipt-read" : "message-receipt");
+                    box.getChildren().add(receiptLabel);
+                }
             } else if ("SYSTEM".equals(message.sender)) {
                 Label textLabel = new Label(message.text);
                 textLabel.setStyle("-fx-text-fill: #999; -fx-font-style: italic;");
@@ -1064,13 +1078,31 @@ public class ClientGuiApp extends Application {
 
             VBox bubble = new VBox(8);
             bubble.getStyleClass().add(message.mine ? "message-bubble-me" : "message-bubble-other");
+            bubble.getStyleClass().add("attachment-card");
+            bubble.setMaxWidth(360);
 
-            Label titleLabel = new Label(message.kind == MessageKind.AUDIO ? "Voice message" : "File");
+            boolean image = isImageMessage(message);
+            Label titleLabel = new Label(getAttachmentTitle(message, image));
             titleLabel.getStyleClass().add("attachment-title");
 
             Label fileLabel = new Label(message.fileName);
             fileLabel.getStyleClass().add("attachment-name");
             fileLabel.setWrapText(true);
+
+            Label metaLabel = new Label(formatBytes(message.data.length));
+            metaLabel.getStyleClass().add("attachment-meta");
+
+            if (image) {
+                createImagePreview(message).ifPresent(bubble.getChildren()::add);
+            }
+
+            HBox header = new HBox(10);
+            header.setAlignment(Pos.CENTER_LEFT);
+            Label iconLabel = new Label(getAttachmentIcon(message, image));
+            iconLabel.getStyleClass().add("attachment-icon");
+            VBox titleBox = new VBox(2, titleLabel, fileLabel, metaLabel);
+            HBox.setHgrow(titleBox, Priority.ALWAYS);
+            header.getChildren().addAll(iconLabel, titleBox);
 
             HBox actions = new HBox(8);
             actions.setAlignment(Pos.CENTER_LEFT);
@@ -1087,8 +1119,59 @@ public class ClientGuiApp extends Application {
             saveButton.setOnAction(event -> saveAttachment(message));
             actions.getChildren().add(saveButton);
 
-            bubble.getChildren().addAll(titleLabel, fileLabel, actions);
+            bubble.getChildren().addAll(header, actions);
             return bubble;
+        }
+
+        private boolean isImageMessage(ChatMessage message) {
+            return message.kind == MessageKind.FILE && message.mimeType.toLowerCase().startsWith("image/");
+        }
+
+        private String getAttachmentTitle(ChatMessage message, boolean image) {
+            if (message.kind == MessageKind.AUDIO) {
+                return "Voice message";
+            }
+
+            return image ? "Image" : "File";
+        }
+
+        private String getAttachmentIcon(ChatMessage message, boolean image) {
+            if (message.kind == MessageKind.AUDIO) {
+                return "AUDIO";
+            }
+
+            return image ? "IMG" : "FILE";
+        }
+
+        private java.util.Optional<ImageView> createImagePreview(ChatMessage message) {
+            try {
+                Image image = new Image(new ByteArrayInputStream(message.data), 300, 220, true, true);
+                if (image.isError()) {
+                    return java.util.Optional.empty();
+                }
+
+                ImageView preview = new ImageView(image);
+                preview.setFitWidth(300);
+                preview.setFitHeight(220);
+                preview.setPreserveRatio(true);
+                preview.setSmooth(true);
+                preview.getStyleClass().add("image-preview");
+                return java.util.Optional.of(preview);
+            } catch (IllegalArgumentException e) {
+                return java.util.Optional.empty();
+            }
+        }
+
+        private String formatBytes(int bytes) {
+            if (bytes < 1024) {
+                return bytes + " B";
+            }
+
+            if (bytes < 1024 * 1024) {
+                return String.format("%.1f KB", bytes / 1024.0);
+            }
+
+            return String.format("%.1f MB", bytes / (1024.0 * 1024.0));
         }
     }
 

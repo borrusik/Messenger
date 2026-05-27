@@ -135,6 +135,12 @@ public class MessengerServer {
             return;
         }
 
+        if (Message.ALL.equals(receiverName)
+                && (incomingMessage.getType() == MessageType.FILE || incomingMessage.getType() == MessageType.AUDIO)) {
+            routeBroadcastAttachment(senderName, incomingMessage);
+            return;
+        }
+
         ClientHandler receiver = clientsByUsername.get(receiverName);
 
         if (receiver == null) {
@@ -162,6 +168,29 @@ public class MessengerServer {
         notifyConversationMessage(conversation, line);
 
         if (conversations.register(conversation)) {
+            notifyConversationsChanged();
+        }
+    }
+
+    private void routeBroadcastAttachment(String senderName, Message incomingMessage) {
+        Message routedMessage = new Message(
+                incomingMessage.getType(),
+                senderName,
+                Message.ALL,
+                incomingMessage.getText(),
+                incomingMessage.getId(),
+                incomingMessage.getFileName(),
+                incomingMessage.getMimeType()
+        );
+        broadcast(routedMessage);
+
+        String displayText = describeMessage(incomingMessage);
+        String line = senderName + ": " + displayText;
+        database.saveMessage(SERVER_CHAT, routedMessage.getType(), senderName, Message.ALL, displayText);
+        log(senderName + " -> " + SERVER_CHAT + ": " + displayText);
+        notifyConversationMessage(SERVER_CHAT, line);
+
+        if (conversations.register(SERVER_CHAT)) {
             notifyConversationsChanged();
         }
     }
